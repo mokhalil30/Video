@@ -1,0 +1,218 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Smart Video Conference</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      margin: 0;
+      padding: 0;
+      background-color: #f4f4f9;
+      color: #333;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      height: 100vh;
+    }
+
+    .login-page, .signup-page, .homepage, .room-page {
+      text-align: center;
+    }
+
+    input {
+      padding: 10px;
+      width: 200px;
+      margin: 10px 0;
+      border: 1px solid #ccc;
+      border-radius: 5px;
+    }
+
+    button {
+      padding: 10px 20px;
+      background-color: #007BFF;
+      color: white;
+      border: none;
+      border-radius: 5px;
+      cursor: pointer;
+    }
+
+    button:hover {
+      background-color: #0056b3;
+    }
+
+    .video-container {
+      display: flex;
+      justify-content: center;
+      gap: 10px;
+      margin-top: 20px;
+    }
+
+    .video {
+      width: 300px;
+      height: 200px;
+      background-color: black;
+      border: 2px solid #ccc;
+      border-radius: 10px;
+    }
+  </style>
+</head>
+<body>
+  <div id="app"></div>
+
+  <script>
+    const crypto = window.crypto || window.msCrypto;
+
+    // User and Room Data Storage
+    const userDatabase = {};
+    const roomDatabase = {};
+
+    // Hashing function for passwords
+    async function hashPassword(password) {
+      const encoder = new TextEncoder();
+      const data = encoder.encode(password);
+      const hashBuffer = await crypto.subtle.digest('SHA-256', data);
+      return Array.from(new Uint8Array(hashBuffer))
+        .map(b => b.toString(16).padStart(2, '0'))
+        .join('');
+    }
+
+    const app = document.getElementById('app');
+
+    // Login Page Functionality
+    function renderLoginPage() {
+      app.innerHTML = `
+        <div class="login-page">
+          <h1>Welcome to Smart Video Conference</h1>
+          <input id="username" type="text" placeholder="Enter Username" />
+          <input id="password" type="password" placeholder="Enter Password" />
+          <button onclick="login()">Login</button>
+          <p>Don't have an account? <a href="#" onclick="renderSignupPage()">Sign Up</a></p>
+        </div>
+      `;
+    }
+
+    async function login() {
+      const username = document.getElementById('username').value.trim();
+      const password = document.getElementById('password').value.trim();
+
+      if (!username || !password) {
+        alert('Please enter both username and password.');
+        return;
+      }
+
+      const hashedPassword = await hashPassword(password);
+      if (userDatabase[username] && userDatabase[username] === hashedPassword) {
+        alert(`Welcome, ${username}!`);
+        renderHomePage(username);
+      } else {
+        alert('Invalid username or password.');
+      }
+    }
+
+    // Sign Up Page Functionality
+    function renderSignupPage() {
+      app.innerHTML = `
+        <div class="signup-page">
+          <h1>Create an Account</h1>
+          <input id="new-username" type="text" placeholder="Enter Username" />
+          <input id="new-password" type="password" placeholder="Enter Password" />
+          <input id="confirm-password" type="password" placeholder="Confirm Password" />
+          <button onclick="signup()">Sign Up</button>
+          <p>Already have an account? <a href="#" onclick="renderLoginPage()">Login</a></p>
+        </div>
+      `;
+    }
+
+    async function signup() {
+      const username = document.getElementById('new-username').value.trim();
+      const password = document.getElementById('new-password').value.trim();
+      const confirmPassword = document.getElementById('confirm-password').value.trim();
+
+      if (!username || !password || !confirmPassword) {
+        alert('Please fill in all fields.');
+        return;
+      }
+
+      if (password !== confirmPassword) {
+        alert('Passwords do not match.');
+        return;
+      }
+
+      if (userDatabase[username]) {
+        alert('Username already exists. Please choose a different username.');
+        return;
+      }
+
+      const hashedPassword = await hashPassword(password);
+      userDatabase[username] = hashedPassword;
+      alert(`Account created for ${username}! Please log in.`);
+      renderLoginPage();
+    }
+
+    // Home Page Functionality
+    function renderHomePage(username) {
+      app.innerHTML = `
+        <div class="homepage">
+          <h1>Welcome, ${username}!</h1>
+          <button onclick="createRoom()">Create Room</button>
+          <input id="room-id" type="text" placeholder="Enter Room ID" />
+          <button onclick="joinRoom()">Join Room</button>
+        </div>
+      `;
+    }
+
+    function createRoom() {
+      const roomId = Math.random().toString(36).substring(2, 8); // Generate a random 6-character ID
+      roomDatabase[roomId] = { participants: [] };
+      alert(`Room created successfully! Your Room ID is: ${roomId}`);
+    }
+
+    function joinRoom() {
+      const roomId = document.getElementById('room-id').value.trim();
+      if (roomDatabase[roomId]) {
+        alert(`Successfully joined room: ${roomId}`);
+        renderRoomPage(roomId);
+      } else {
+        alert('Room ID not found. Please enter a valid Room ID.');
+      }
+    }
+
+    // Room Page Functionality
+    function renderRoomPage(roomId) {
+      app.innerHTML = `
+        <div class="room-page">
+          <h2>Room: ${roomId}</h2>
+          <div class="video-container">
+            <video id="localVideo" class="video" autoplay muted></video>
+            <video id="remoteVideo" class="video" autoplay></video>
+          </div>
+        </div>
+      `;
+
+      setupVideoStream(roomId);
+    }
+
+    // Video Stream Setup
+    function setupVideoStream(roomId) {
+      navigator.mediaDevices
+        .getUserMedia({ video: true, audio: true })
+        .then((stream) => {
+          const localVideo = document.getElementById('localVideo');
+          if (localVideo) {
+            localVideo.srcObject = stream;
+          }
+          roomDatabase[roomId].participants.push("Local User");
+          console.log(`Joined room: ${roomId}`);
+        })
+        .catch((err) => {
+          console.error('Error accessing media devices:', err);
+        });
+    }
+
+    // Initial Render
+    renderLoginPage();
+  </script>
+</body>
+</html>
